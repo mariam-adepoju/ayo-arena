@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#292a23">
+<title>Ayo Arena</title>
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<header class="top">
+  <div class="startng-card" id="player-card" hidden>
+    <img id="player-face" alt="">
+    <div class="who">
+      <b id="player-name"></b>
+      <span id="player-account"></span>
+    </div>
+    <button id="player-sign-in" type="button" hidden>Sign in</button>
+  </div>
+  <div class="top-actions">
+    <button class="icon" id="btn-sound" type="button" aria-label="Sound" title="Sound">🔊</button>
+    <button class="icon" id="btn-help" type="button" aria-label="How to play" title="How to play">?</button>
+  </div>
+</header>
+
+<main>
+  <section id="menu" class="screen">
+    <div class="logo">
+      <div class="logo-seeds" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+      <h1>Ayo <em>Arena</em></h1>
+      <p class="tag">The old seed-sowing game of Nigeria. Climb a ladder of rivals, each one sharper than the last.</p>
+    </div>
+    <div class="menu-buttons">
+      <button class="btn primary" id="btn-ladder" type="button">Climb the ladder<small>Beat rival after rival. One loss ends the run.</small></button>
+      <button class="btn" id="btn-duo" type="button">Two players<small>Pass the phone, settle it properly.</small></button>
+      <button class="btn ghost" id="btn-board" type="button">Leaderboard</button>
+    </div>
+    <p class="best" id="best-line"></p>
+  </section>
+
+  <section id="game" class="screen" hidden>
+    <div class="opp-row">
+      <div class="opp-avatar" id="opp-avatar">?</div>
+      <div class="opp-info">
+        <b id="opp-name">Opponent</b>
+        <span id="opp-sub"></span>
+      </div>
+      <div class="bubble" id="bubble" hidden></div>
+    </div>
+
+    <div class="table">
+      <div class="store store-top" id="store1">
+        <span class="store-label" id="store1-label">Rival</span>
+        <b class="store-count" id="store1-count">0</b>
+        <div class="store-seeds" id="store1-seeds"></div>
+      </div>
+      <div class="board" id="board" role="group" aria-label="Ayo board"></div>
+      <div class="store store-bottom" id="store0">
+        <span class="store-label" id="store0-label">You</span>
+        <b class="store-count" id="store0-count">0</b>
+        <div class="store-seeds" id="store0-seeds"></div>
+      </div>
+    </div>
+
+    <p class="status" id="status" aria-live="polite"></p>
+
+    <div class="game-foot">
+      <div class="runstats" id="runstats"></div>
+      <button class="btn small ghost" id="btn-quit" type="button">Leave game</button>
+    </div>
+  </section>
+</main>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="modal" role="dialog" aria-modal="true" id="modal"></div>
+</div>
+
+<script src="./engine.js"></script>
+<script src="./app.js"></script>
+</body>
+</html>
