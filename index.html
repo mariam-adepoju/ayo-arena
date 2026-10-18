@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="./style.css">
 </head>
 <body>
+<div class="errbar" id="errbar" hidden></div>
 <header class="top">
   <div class="startng-card" id="player-card" hidden>
     <img id="player-face" alt="">
@@ -36,6 +37,18 @@
       <button class="btn ghost" id="btn-board" type="button">Leaderboard</button>
     </div>
     <p class="best" id="best-line"></p>
+
+    <section class="howto" id="howto" aria-labelledby="howto-h">
+      <h2 id="howto-h">How to play</h2>
+      <ol class="steps">
+        <li><b>The board.</b> Two rows of 6 pits, 4 seeds in each. Your row is the one <b>closest to you</b> (the left column on a phone). The big trays at the ends hold captured seeds; yours is the one on your side.</li>
+        <li><b>Your move.</b> Tap one of your <b>glowing</b> pits. You lift every seed in it and drop them one by one into the next pits, going <b>counter-clockwise</b>: along your row, then back along the rival's row.</li>
+        <li><b>Capture.</b> If your last seed lands in a <b>rival pit that now holds 2 or 3 seeds</b>, you capture them. Keep going backwards: every rival pit before it that also holds 2 or 3 is captured too.</li>
+        <li><b>The small print.</b> A pit with 12 or more seeds skips the pit it started from. You can't capture <em>all</em> of the rival's seeds in one move (nothing is taken). If the rival has no seeds, you must make a move that gives them some.</li>
+        <li><b>Win.</b> The first to capture <b>25 seeds</b> wins. Keys 1 to 6 also pick your pits.</li>
+        <li><b>The ladder.</b> Beat each rival to face a smarter one. One loss ends your run. Sign in on start.ng and your best run lands on the leaderboard.</li>
+      </ol>
+    </section>
   </section>
 
   <section id="game" class="screen" hidden>
@@ -52,17 +65,23 @@
       <div class="store store-top" id="store1">
         <span class="store-label" id="store1-label">Rival</span>
         <b class="store-count" id="store1-count">0</b>
-        <div class="store-seeds" id="store1-seeds"></div>
       </div>
-      <div class="board" id="board" role="group" aria-label="Ayo board"></div>
+      <div class="stage" id="stage"></div>
       <div class="store store-bottom" id="store0">
         <span class="store-label" id="store0-label">You</span>
         <b class="store-count" id="store0-count">0</b>
-        <div class="store-seeds" id="store0-seeds"></div>
       </div>
     </div>
 
     <p class="status" id="status" aria-live="polite"></p>
+    <details class="quick">
+      <summary>Quick rules</summary>
+      <ul>
+        <li>Tap a glowing pit: its seeds are sown one per pit, counter-clockwise.</li>
+        <li>Last seed in a rival pit that now has 2 or 3 seeds: you capture it (and the 2s/3s behind it).</li>
+        <li>First to 25 seeds wins. If the rival is empty, you must feed them.</li>
+      </ul>
+    </details>
 
     <div class="game-foot">
       <div class="runstats" id="runstats"></div>
@@ -75,7 +94,30 @@
   <div class="modal" role="dialog" aria-modal="true" id="modal"></div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"></script>
+<script>window.THREE || document.write('<script src="./vendor/three.min.js"><\/script>');</script>
 <script src="./engine.js"></script>
+<script src="./board3d.js"></script>
 <script src="./app.js"></script>
+<script>
+/* Shows a plain-language message if a game file did not load (wrong folder, blocked CDN...). */
+(function () {
+  function bar(html) { var b = document.getElementById('errbar'); b.innerHTML = html; b.hidden = false; }
+  window.addEventListener('error', function (e) {
+    if (e.target && e.target !== window) return; // resource errors handled on load
+    bar('<b>Something broke:</b> ' + String(e.message).replace(/</g, '&lt;') + (e.filename ? ' (' + e.filename.split('/').pop() + ':' + e.lineno + ')' : ''));
+  });
+  window.addEventListener('load', function () {
+    var miss = [];
+    if (typeof Ayo === 'undefined') miss.push('engine.js');
+    if (typeof Board3D === 'undefined') miss.push('board3d.js');
+    if (!window.__appLoaded) miss.push('app.js');
+    var bg = getComputedStyle(document.body).backgroundColor;
+    if (bg === 'rgba(0, 0, 0, 0)' || bg === 'rgb(255, 255, 255)') miss.push('style.css');
+    if (miss.length) bar('<b>These files did not load:</b> ' + miss.join(', ') + '. Make sure they are in the same folder as index.html, and start the server from inside that folder.');
+    else if (typeof THREE === 'undefined') bar('<b>three.js did not load.</b> Check your internet connection, or save a copy as vendor/three.min.js (see README).');
+  });
+})();
+</script>
 </body>
 </html>

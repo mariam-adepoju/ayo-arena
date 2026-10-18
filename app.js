@@ -1,6 +1,7 @@
 /* Ayo Arena: UI, ladder, and start.ng hookup. Rules live in engine.js. */
 (function () {
   'use strict';
+  window.__appLoaded = true;
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -126,62 +127,31 @@
   };
   const pick = (a) => a[Math.floor(Math.random() * a.length)];
 
-  /* ---------- board DOM ---------- */
-  const boardEl = $('board');
-  const pitEls = [];
-  // visual order: top row pits 11..6 (left to right), bottom row 0..5
-  const ORDER = [11, 10, 9, 8, 7, 6, 0, 1, 2, 3, 4, 5];
-  for (const i of ORDER) {
-    const b = document.createElement('button');
-    b.type = 'button'; b.className = 'pit'; b.dataset.i = i;
-    b.innerHTML = '<span class="seeds"></span><span class="count"></span>' + (i < 6 ? `<span class="key">${i + 1}</span>` : '');
-    b.onclick = () => onPit(i);
-    boardEl.append(b);
-    pitEls[i] = b;
-  }
-  const SEED_CAP = 30;
-  function paintSeeds(container, count, salt, wide) {
-    if (container._n === count) return;
-    container._n = count;
-    container.textContent = '';
-    const frag = document.createDocumentFragment();
-    for (let k = 0; k < Math.min(count, SEED_CAP); k++) {
-      const a = k * 2.399963 + salt * 1.7;
-      const r = Math.min(0.36, 0.07 * Math.sqrt(k + 0.6));
-      const jx = Math.sin((k + 1) * 12.9898 + salt * 78.233) * 43758.5453; const jy = Math.sin((k + 1) * 39.346 + salt * 11.135) * 24634.6345;
-      const fx = (jx - Math.floor(jx) - 0.5) * 0.07, fy = (jy - Math.floor(jy) - 0.5) * 0.07;
-      const s = document.createElement('i');
-      s.className = 'seed s' + ((k + salt) % 4);
-      const sx = wide ? 0.9 : 1;
-      s.style.left = (50 + (Math.cos(a) * r + fx) * 100 * sx + (wide ? 0 : 0)) + '%';
-      s.style.top = (50 + (Math.sin(a) * r + fy) * 100) + '%';
-      s.style.transform = `translate(-50%,-50%) rotate(${Math.round((jx - Math.floor(jx)) * 360)}deg)`;
-      frag.append(s);
+  /* ---------- 3D board (three.js, see board3d.js) ---------- */
+  let view = null;
+  function ensureView() {
+    if (view) { view.resize(); return true; }
+    const stage = $('stage');
+    try {
+      if (typeof THREE === 'undefined') throw new Error('three.js did not load');
+      view = Board3D.create(stage, { onPick: (i) => onPit(i) });
+      return true;
+    } catch (err) {
+      console.error(err);
+      stage.innerHTML = '<div class="fail">The 3D board could not start. Check your connection and that your browser supports WebGL, then reload.</div>';
+      return false;
     }
-    container.append(frag);
-  }
-  function paintStore(p, n) {
-    $('store' + p + '-count').textContent = n;
-    paintSeeds($('store' + p + '-seeds'), n, 40 + p, true);
   }
 
   let game = null;       // current game
-  let disp = null;       // displayed pits during animation
   let dispStore = [0, 0];
 
   function render(legal) {
-    for (let i = 0; i < 12; i++) {
-      const el = pitEls[i];
-      paintSeeds(el.firstChild, disp[i], i);
-      el.querySelector('.count').textContent = disp[i] || '';
-      const isLegal = !!legal && legal.includes(i);
-      el.classList.toggle('legal', isLegal);
-      el.disabled = !isLegal;
-      el.setAttribute('aria-label', `Pit ${i < 6 ? i + 1 : 'rival ' + (12 - i)}, ${disp[i]} seeds`);
-    }
-    paintStore(0, dispStore[0]); paintStore(1, dispStore[1]);
+    if (view) view.setLegal(legal || null);
+    $('store0-count').textContent = dispStore[0];
+    $('store1-count').textContent = dispStore[1];
   }
-  function flash(i, cls) { const el = pitEls[i]; el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); }
+  function flash(i, kind) { if (view) view.flash(i, kind); }
   function say(html) { $('status').innerHTML = html; }
   function bubble(text) {
     const b = $('bubble');
@@ -191,7 +161,7 @@
   }
 
   /* ---------- game flow ---------- */
-  const SPEED = 230;
+  const SPEED = 260;
   function startGame(mode, level = 0, run = null) {
     const aiFirst = mode === 'ladder' && level % 2 === 1;
     const s = Ayo.newState();
@@ -217,7 +187,9 @@
       $('opp-sub').textContent = 'Pass the phone after each move';
       bubble('');
     }
-    disp = s.pits.slice(); dispStore = [0, 0];
+    dispStore = [0, 0];
+    if (!ensureView()) return;
+    view.setPits(s.pits, [0, 0]);
     paintRunStats();
     render(null);
     nextTurn();
@@ -252,7 +224,7 @@
       say(`<b>${esc(who)}</b>, your move. ${s.turn === 0 ? 'Pick a pit on the bottom row.' : 'Pick a pit on the top row.'}`);
     } else {
       const fed = Ayo.seedsOn(s, 1) === 0;
-      say(fed ? 'Rival has no seeds. <b>You must feed them.</b>' : 'Your move. Tap a glowing pit.');
+      say(fed ? 'Rival has no seeds. <b>You must feed them.</b>' : 'Your move. Tap a glowing pit on your row.');
     }
   }
 
@@ -277,29 +249,22 @@
     const before = g.s;
     const r = Ayo.applyMove(before, pit);
     const mover = before.turn;
-    // lift seeds
-    disp = before.pits.slice();
-    disp[pit] = 0;
-    flash(pit, 'grab'); pitEls[pit].classList.add('grab');
-    sfx.grab(); render(null);
+    flash(pit, 'grab'); sfx.grab();
     say(`${isAI(mover) ? esc(g.opp.name) : 'Sowing'}: ${before.pits[pit]} seeds from pit ${mover === 0 ? pit + 1 : 12 - pit}`);
-    await sleep(320);
-    pitEls[pit].classList.remove('grab');
+    await view.lift(pit);
     for (const idx of r.sown) {
       if (g !== game) return;
-      await sleep(SPEED);
-      disp[idx]++;
+      await view.drop(idx, SPEED);
       sfx.drop(idx); flash(idx, 'drop');
-      render(null);
     }
-    await sleep(260);
+    await sleep(220);
     if (g !== game) return;
     if (r.captured.length) {
       for (const i of r.captured) flash(i, 'cap');
       sfx.capture();
       say(`<b>${mover === 0 || g.mode === 'duo' ? (mover === 0 ? 'You capture' : 'Player 2 captures') : esc(g.opp.name) + ' captures'} ${r.gained}</b>`);
-      await sleep(520);
-      for (const i of r.captured) disp[i] = 0;
+      await sleep(500);
+      await view.capture(r.captured, mover);
       dispStore[mover] += r.gained;
       $('store' + mover).classList.remove('flash'); void $('store' + mover).offsetWidth; $('store' + mover).classList.add('flash');
       if (g.mode === 'ladder') {
@@ -308,16 +273,16 @@
         paintRunStats();
       }
       render(null);
-      await sleep(300);
+      await sleep(250);
     } else if (r.grandSlam) {
       say('Grand slam: capturing every seed is not allowed, so nothing is taken.');
       await sleep(900);
     }
     g.s = r.state;
     if (r.ended) {
-      // show final sweep
-      disp = r.state.pits.slice(); dispStore = r.state.store.slice();
+      dispStore = r.state.store.slice();
       if (r.state.reason === 'starved' || r.state.reason === 'cycle') say('No more moves: each side keeps the seeds on its own pits.');
+      view.setPits(r.state.pits, r.state.store);
       render(null);
       await sleep(r.state.reason === 'majority' ? 400 : 1100);
       return finish();
@@ -423,7 +388,7 @@
   function showHelp() {
     modal(`<h2>How to play</h2>
       <ul>
-        <li>Each side has <b>6 pits</b> with <b>4 seeds</b>. Tap one of your pits to lift all its seeds and sow them one by one, counter-clockwise (your row runs left to right, then back along the rival's row).</li>
+        <li>Each side has <b>6 pits</b> with <b>4 seeds</b>. Tap one of your glowing pits to lift all its seeds and sow them one by one, counter-clockwise around the board.</li>
         <li>If your last seed lands in a <b>rival pit that now holds 2 or 3 seeds</b>, you capture them. Keep going backwards through rival pits that also hold 2 or 3.</li>
         <li>A pit with 12 or more seeds skips the pit it started from.</li>
         <li>You may not take <b>every</b> rival seed in one capture (grand slam), and if the rival has no seeds you must give them some.</li>
